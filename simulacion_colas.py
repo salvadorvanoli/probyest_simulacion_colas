@@ -10,7 +10,7 @@ tiempo = 0
 # Definir clase Cliente
 class Cliente:
     def __init__(self, id):
-        self.id = id
+        self.id = id 
         self.tiempo_llegada = np.random.poisson(3)  # Tiempo de llegada en base a Distribución Poisson
         self.productos = self.generar_productos()  # Llama a función que define número de productos
         self.pago_efectivo = random.random() < 0.4  # Pago en efectivo (Bernoulli con probabilidad de 0.4)
@@ -19,7 +19,7 @@ class Cliente:
 
     # Función que define número de productos según Distribución normal con media 5 y desviación 3.
     def generar_productos(self, media=5, desviacion=3, minimo=1, maximo=10):
-        a, b = (minimo - media) / desviacion, (maximo - media) / desviacion
+        a, b = (minimo - media) / desviacion, (maximo - media) / desviacion # a = -1,3333333333...  -  b = 1,666666666...
         return int(truncnorm.rvs(a, b, loc=media, scale=desviacion))
 
     def __str__(self):
@@ -64,7 +64,7 @@ cajas = [Caja(i) for i in range(1, num_cajas + 1)]
 
 # Crear lista de clientes y simular la atención
 clientes = []
-for i in range(10):
+for i in range(10000):
     cliente = Cliente(id=i + 1)
     clientes.append(cliente)
 
@@ -75,7 +75,7 @@ for cliente in clientes:
 
 # Calcular tiempo inactivo para cada caja
 for caja in cajas:
-    caja.tiempo_inactivo = tiempo - (caja.tiempo_total_activa + caja.tiempo_total_espera)
+    caja.tiempo_inactivo = tiempo - (caja.tiempo_total_activa)
 
 # Datos para graficar
 tiempos_activas = [caja.tiempo_total_activa for caja in cajas]
@@ -93,13 +93,24 @@ plt.ylabel('Tiempo Activo (min)')
 plt.title('Tiempo Activo de Cada Caja')
 plt.xticks(cajas_ids)
 
-# Gráfica de tiempo inactivo
-plt.subplot(1, 2, 2)
-plt.bar(cajas_ids, tiempos_inactivos, color='orange')
-plt.xlabel('Cajas')
-plt.ylabel('Tiempo Inactivo (min)')
-plt.title('Tiempo Inactivo de Cada Caja')
-plt.xticks(cajas_ids)
 
 plt.tight_layout()
 plt.show()
+
+def graficar_productos_por_cliente(clientes):
+    """
+    Genera un histograma que muestra la cantidad de clientes por número de productos.
+    :param clientes: Lista de objetos Cliente.
+    """
+    productos_por_cliente = [cliente.productos for cliente in clientes]
+
+    plt.hist(productos_por_cliente, bins=range(1, 12), edgecolor='black', align='left')
+    plt.xlabel('Número de productos')
+    plt.ylabel('Cantidad de clientes')
+    plt.title('Distribución de clientes por número de productos')
+    plt.grid(axis='y', alpha=0.75)
+    plt.show()
+
+# Ejemplo de uso
+clientes_prueba = [Cliente(i) for i in range(10000)]
+graficar_productos_por_cliente(clientes_prueba)
