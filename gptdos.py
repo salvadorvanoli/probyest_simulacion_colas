@@ -41,6 +41,7 @@ class Caja:
         self.tiempo_total_espera = 0
         self.tiempo_total_activa = 0
         self.tiempo_inactivo = 0
+        self.tiempo_fin_ultima_atencion = 0  # Momento en que termina la atención del último cliente
 
     # Agregar cliente a cola
     def atender_cliente(self, cliente):
@@ -48,12 +49,18 @@ class Caja:
         if self.clientes_en_cola:
             tiempo_disponible = self.clientes_en_cola[-1].tiempo_llegada_acumulado + self.clientes_en_cola[-1].tiempo_total
         else:
-            tiempo_disponible = tiempo
+            tiempo_disponible = cliente.tiempo_llegada_acumulado  # El primer cliente no espera si no hay cola
 
-        cliente.tiempo_espera = max(0, tiempo_disponible - cliente.tiempo_llegada)
+        cliente.tiempo_espera = max(0, tiempo_disponible - cliente.tiempo_llegada_acumulado)
         self.tiempo_total_espera += cliente.tiempo_espera
-        tiempo_fin = cliente.tiempo_llegada + cliente.tiempo_espera + cliente.tiempo_total
+        tiempo_fin = cliente.tiempo_llegada_acumulado + cliente.tiempo_espera + cliente.tiempo_total
         self.tiempo_total_activa += cliente.tiempo_total
+
+        # Calcular inactividad entre la última atención y la nueva
+        if self.tiempo_fin_ultima_atencion > 0:
+            self.tiempo_inactivo += max(0, cliente.tiempo_llegada_acumulado - self.tiempo_fin_ultima_atencion)
+
+        self.tiempo_fin_ultima_atencion = tiempo_fin  # Actualizamos el tiempo de fin de la atención
         self.clientes_en_cola.append(cliente)
 
     def num_clientes_en_cola(self):
@@ -75,15 +82,47 @@ while opcion not in ['1', '2']:
     if opcion not in ['1', '2']:
         print("\nError: opción inválida\n")
 
-# Crear lista de cajas
+def ingresar_num_cajas_positivo():
+    while True:
+        try:
+            numero = int(input("Ingresa un número de cajas (1 - 5): "))
+            if not 1 <= numero <= 5:
+                print("Error: El número debe estar entre 1 y 5, se asignará el valor default 3")
+                return 3
+            else:
+                return numero
+        except ValueError:
+            print("Error: Debes ingresar un número válido, se asignará el valor default 3")
+            return 3
+        
+num_cajas = ingresar_num_cajas_positivo()
 
+def ingresar_numero_positivo():
+    while True:
+        try:
+            numero = int(input("Ingresa un número de clientes: "))
+            if numero <= 0:
+                print("Error: El número debe ser mayor que 0, se asignará el valor default 100")
+                return 100
+            else:
+                return numero
+        except ValueError:
+            print("Error: Debes ingresar un número válido, se asignará el valor default 100")
+            return 100
+
+# Uso de la función
+num_clientes = ingresar_numero_positivo()
+
+
+
+# Crear lista de cajas
 cajas = [Caja(i) for i in range(1, num_cajas + 1)]
 
 # Generar tiempos de llegada según distribución de Poisson
 clientes = []
 llegada_acumulada = 0
 for i in range(num_clientes):
-    variable_poisson = np.random.poisson(1)
+    variable_poisson = np.random.poisson(3)
     if i != 0:
         llegada_acumulada += variable_poisson  # El tiempo de llegada está dado por una Poisson con media 3
         llegada = variable_poisson
@@ -93,23 +132,22 @@ for i in range(num_clientes):
     cliente = Cliente(id=i + 1, tiempo_llegada=llegada, tiempo_llegada_acumulado=llegada_acumulada)
     clientes.append(cliente)
 
-    # Aumentamos el tiempo
-    tiempo = llegada_acumulada
-    if i == num_clientes:
-        tiempo += cliente.tiempo_total
-
-
 # Atender clientes
 for cliente in clientes:
     caja = seleccionar_caja(cajas)
     caja.atender_cliente(cliente)
 
+# Actualizar el tiempo total de la simulación después de atender todos los clientes
+tiempo = max(caja.tiempo_fin_ultima_atencion for caja in cajas)
+
 # Calcular tiempo inactivo para cada caja
 for caja in cajas:
-    print(f"\nCaja {caja.id}")
-    print(f"Tiempo: {tiempo}")
-    print(f"tiempo_total_activa: {caja.tiempo_total_activa}\n")
-    caja.tiempo_inactivo = tiempo - caja.tiempo_total_activa
+    if caja.num_clientes_en_cola() == 0:
+        # Si la caja no tuvo clientes, estuvo inactiva todo el tiempo de simulación
+        caja.tiempo_inactivo = tiempo
+    else:
+        # Tiempo inactivo desde el último cliente atendido hasta el final de la simulación
+        caja.tiempo_inactivo += max(0, tiempo - caja.tiempo_fin_ultima_atencion)
 
 # Gráfica de tiempo de uso de cada caja
 tiempos_activas = [caja.tiempo_total_activa for caja in cajas]
@@ -118,6 +156,7 @@ cajas_ids = [caja.id for caja in cajas]
 
 plt.figure(figsize=(15, 5))
 
+# Gráfico de tiempos activos de cada caja
 plt.subplot(1, 3, 1)
 plt.bar(cajas_ids, tiempos_activas, color='blue')
 plt.xlabel('Cajas')
@@ -134,16 +173,16 @@ plt.scatter(ids_clientes, tiempos_espera_clientes, color='green', edgecolor='bla
 plt.xlabel('ID Cliente')
 plt.ylabel('Tiempo de Espera (min)')
 plt.title('Tiempo de Espera de los Clientes')
-plt.xticks(range(0, len(clientes) + 1, 10))  # Ajuste del eje X
+plt.xticks(range(1, len(clientes) + 1, 10))  # Mostrar ID de cliente cada 1
 
-# Grafica de tiempos de llegada de cada cliente (scatter plot)
+# Gráfica de tiempos de llegada de cada cliente (scatter plot)
 tiempos_llegada_clientes = [cliente.tiempo_llegada for cliente in clientes]
 plt.subplot(1, 3, 3)
 plt.scatter(ids_clientes, tiempos_llegada_clientes, color='green', edgecolor='black')
 plt.xlabel('ID Cliente')
 plt.ylabel('Tiempo de Llegada (min)')
 plt.title('Tiempo de Llegada de los Clientes')
-plt.xticks(range(0, len(clientes) + 1, 10))  # Ajuste del eje X
+plt.xticks(range(1, len(clientes) + 1, 10))  # Ajuste del eje X
 
 plt.tight_layout()
 plt.show()
@@ -160,6 +199,6 @@ desviacion_espera_clientes = np.std(tiempos_espera_clientes)
 print(f"Valor medio del tiempo de espera de los clientes: {media_espera_clientes:.2f} min")
 print(f"Desviación estándar del tiempo de espera de los clientes: {desviacion_espera_clientes:.2f} min")
 
-# Tiempo libre de cada caja
+# Tiempos inactivos de las cajas
 for caja in cajas:
-    print(f"Caja {caja.id}: Tiempo libre = {caja.tiempo_inactivo:.2f} min")
+    print(f"Caja {caja.id} - Tiempo inactivo: {caja.tiempo_inactivo:.2f} min")
